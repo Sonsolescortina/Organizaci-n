@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Organización casa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;800&display=swap" rel="stylesheet">
+<style>
+/* VOICE: cuadro de mandos familiar, claro y rápido de leer en el móvil por la mañana.
+   IDEA: la pizarra de la cocina — un carril por hijo sobre la regla de horas del día.
+   PICTURE: línea de tiempo del día con bloques por hijo y la línea de "ahora".
+   COLOUR and TYPE: blanco, tinta casi negra, un color fijo por hijo; Figtree.
+   LAYOUT: título-resumen, cifras clave, línea de tiempo grande, carga semanal, detalle. */
+:root{color-scheme:light dark;
+--bg:light-dark(#ffffff,#141517);--panel:light-dark(#f4f4f2,#1e1f22);--ink:light-dark(#111111,#f0efec);
+--mut:light-dark(#5a5955,#b5b4ad);--rule:light-dark(#e2e1dc,#2e2f33);--now:light-dark(#e34948,#e66767);
+--k1:light-dark(#2a78d6,#3987e5);--k2:light-dark(#eb6834,#d95926);--k3:light-dark(#1baf7a,#199e70);--k4:light-dark(#6250d6,#9085e9);--k5:light-dark(#e87ba4,#d55181)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Figtree,system-ui,sans-serif;overflow-x:clip}
+.band{padding:clamp(20px,3vw,40px) max(5vw,16px);max-width:1240px;margin:0 auto}
+h1{font-size:clamp(28px,4.5vw,44px);line-height:1.05;margin:4px 0 6px;font-weight:800;text-wrap:balance}
+h2{font-size:22px;margin:0 0 12px;font-weight:700}
+.sub{color:var(--mut);margin:0}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-top:20px}
+.kpi{background:var(--panel);border-radius:12px;padding:14px 16px}
+.kpi b{display:block;font-size:30px;line-height:1.1;font-weight:800;white-space:nowrap}
+.kpi span{color:var(--mut);font-size:14px}
+.days{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
+button,.btn{font:inherit;font-size:15px;min-height:44px;padding:0 16px;border-radius:22px;border:1px solid var(--rule);background:var(--bg);color:var(--ink);cursor:pointer}
+button[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+button:focus-visible,.btn:focus-within{outline:3px solid var(--k1);outline-offset:2px}
+.tl{position:relative;border-top:1px solid var(--rule)}
+.lane{display:grid;grid-template-columns:96px minmax(0,1fr);border-bottom:1px solid var(--rule);min-height:64px}
+.lane>.n{display:flex;align-items:center;gap:8px;font-weight:600;padding-right:8px}
+.dot{width:10px;height:10px;border-radius:50%;flex:none}
+.track{position:relative;background-image:linear-gradient(to right,var(--rule) 1px,transparent 1px);background-size:calc(100%/16) 100%}
+.blk{position:absolute;top:8px;bottom:8px;border-radius:6px;padding:4px 6px;font-size:13px;line-height:1.2;overflow:hidden;color:#fff;cursor:default;border:2px solid var(--bg)}
+.blk.school{background:repeating-linear-gradient(135deg,var(--panel) 0 6px,var(--rule) 6px 8px)!important;color:var(--mut)}
+.blk small{display:block;opacity:.9;white-space:nowrap}
+.axis{display:grid;grid-template-columns:96px minmax(0,1fr);font-size:13px;color:var(--mut)}
+.axis .t{position:relative;height:22px}.axis .t span{position:absolute;transform:translateX(-50%)}
+.nowline{position:absolute;top:0;bottom:0;width:2px;background:var(--now);z-index:2;pointer-events:none}
+.nowline::after{content:"ahora";position:absolute;top:-20px;left:-14px;font-size:12px;color:var(--now);font-weight:600}
+.empty{color:var(--mut);font-size:14px;align-self:center;padding-left:8px}
+.grid2{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:28px}
+@media(max-width:860px){.grid2{grid-template-columns:minmax(0,1fr)}}
+table{border-collapse:collapse;width:100%;font-size:15px}
+th,td{padding:8px 6px;border-bottom:1px solid var(--rule);text-align:left;vertical-align:top}
+th{font-weight:600;color:var(--mut);font-size:13px}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.heat td.c{text-align:center;font-variant-numeric:tabular-nums;border:2px solid var(--bg);border-radius:6px;white-space:nowrap}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.cell-act{display:block;font-size:13px;line-height:1.25;margin:2px 0}
+.cell-act i{font-style:normal;color:var(--mut);white-space:nowrap}
+#tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--bg);padding:8px 10px;border-radius:8px;font-size:14px;display:none;z-index:9;max-width:240px}
+.foot{display:flex;flex-wrap:wrap;gap:12px;align-items:center;color:var(--mut);font-size:14px}
+.btn input{display:none}.btn{display:inline-flex;align-items:center}
+.err{background:var(--panel);border-left:4px solid var(--now);padding:12px 16px;border-radius:8px}
+pre,.scroll{overflow-x:auto}
+@media(max-width:600px){.lane,.axis{grid-template-columns:64px minmax(0,1fr)}.lane>.n{font-size:14px}.blk small{display:none}.blk{font-size:12px;padding:3px 4px}
+table{font-size:13px}.stack thead{display:none}.stack tr{display:grid;padding-block:10px}.stack td{display:flow-root;border:0;padding:3px 0;padding-inline-start:8em;text-align:start}.stack td::before{content:attr(data-l);float:inline-start;width:7.5em;margin-inline-start:-8em;white-space:normal;color:var(--mut)}.stack td:empty{display:none}}
+@media(prefers-reduced-motion:no-preference){.blk{transition:opacity .2s}}
+</style>
+<script>new MutationObserver(()=>{for(const c of document.querySelectorAll('.stack td:not([data-l])')){let i=0,p=c;while(p=p.previousElementSibling)i+=p.colSpan;c.dataset.l=c.closest('table').rows[0].cells[i]?.textContent||''}}).observe(document,{childList:true,subtree:true})</script>
+</head>
+<body>
+<header class="band">
+  <p class="sub" id="fecha">Cargando…</p>
+  <h1 id="titulo">Organización de la semana</h1>
+  <p class="sub" id="resumen"></p>
+  <div class="kpis" id="kpis"></div>
+</header>
+
+<section class="band" aria-labelledby="h-dia">
+  <h2 id="h-dia">Tablero del día</h2>
+  <div class="days" id="days" role="group" aria-label="Elegir día"></div>
+  <div id="timeline"></div>
+</section>
+
+<section class="band grid2">
+  <div>
+    <h2>Carga semanal (horas fuera del colegio)</h2>
+    <div class="scroll"><table class="heat" id="heat"></table></div>
+  </div>
+  <div>
+    <h2>Actividades</h2>
+    <table class="stack" id="acts"></table>
+  </div>
+</section>
+
+<section class="band" aria-labelledby="h-sem">
+  <h2 id="h-sem">Semana por hijo</h2>
+  <div class="tabs" id="tabs" role="group" aria-label="Elegir hijo"></div>
+  <table class="stack" id="week"></table>
+</section>
+
+<footer class="band foot">
+  <span id="fuente"></span>
+  <label class="btn">Probar con otro Excel<input type="file" id="file" accept=".xlsx,.xls"></label>
+</footer>
+<div id="tip" role="tooltip"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+{
+const EXCEL = 'organizacion.xlsx';
+const DAYS = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+const SHORT = ['L','M','X','J','V','S','D'];
+const T0 = 6, T1 = 22; // regla de 6:00 a 22:00
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const norm = s => String(s ?? '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+const fmt = h => { const H = Math.floor(h), M = Math.round((h - H) * 60); return H + ':' + String(M).padStart(2, '0'); };
+const hrs = h => (Math.round(h * 4) / 4).toLocaleString('es', {maximumFractionDigits: 2}) + ' h';
+let DATA = [], day = (new Date().getDay() + 6) % 7, kidSel = 0;
+
+// "7,40 to 3", "6-7,15", "6,30-7-30" -> [{h,m},{h,m}]
+function parseRange(txt) {
+  const toks = String(txt).match(/\d+/g) || [], pts = [];
+  for (const t of toks) {
+    const v = +t, isMin = pts.length && pts[pts.length - 1].m == null && (v > 12 || (t.length === 2 && t[0] === '0'));
+    if (isMin) pts[pts.length - 1].m = v; else pts.push({h: v, m: null});
+  }
+  return pts.length >= 2 ? pts.slice(0, 2).map(p => p.h + (p.m || 0) / 60) : null;
+}
+// Las franjas vienen en orden: elige mañana/tarde para que cada una empiece después de la anterior.
+function resolveTimes(slots) {
+  let prev = 0;
+  for (const s of slots) {
+    if (!s.raw) continue;
+    let [a, b] = s.raw;
+    if (a < prev - 0.01 && a + 12 < 24) a += 12;
+    if (a < 6 && a + 12 < 24) a += 12;
+    while (b <= a && b + 12 <= 24) b += 12;
+    s.start = a; s.end = b; prev = a;
+  }
+}
+function parseSheet(rows) {
+  const kids = [];
+  let cur = null, cols = null;
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i] || [];
+    const cells = r.map(c => String(c ?? '').trim());
+    const dayIdx = cells.map(c => DAYS.findIndex(d => norm(d) === norm(c)));
+    if (dayIdx.filter(x => x >= 0).length >= 5) { cols = dayIdx; continue; }
+    const nonEmpty = cells.map((c, j) => c ? j : -1).filter(j => j >= 0);
+    const next = (rows[i + 1] || []).map(c => norm(c));
+    if (!cells[0] && nonEmpty.length === 1 && next.includes('lunes')) {
+      cur = {name: cells[nonEmpty[0]], slots: []}; kids.push(cur); cols = null; continue;
+    }
+    if (cur && cols && cells[0]) {
+      const slot = {label: cells[0], raw: parseRange(cells[0]), acts: []};
+      cols.forEach((d, j) => { if (d >= 0 && cells[j]) slot.acts.push({day: d, name: cells[j]}); });
+      cur.slots.push(slot);
+    }
+  }
+  kids.forEach(k => {
+    resolveTimes(k.slots);
+    k.events = k.slots.flatMap(s => s.acts.map(a => ({...a, start: s.start, end: s.end, label: s.label,
+      school: norm(a.name).startsWith('colegio'), key: norm(a.name).replace(/\s+/g, '')})));
+  });
+  return kids;
+}
+const kidColor = i => `var(--k${(i % 5) + 1})`;
+const dur = e => (e.end != null ? e.end - e.start : 0);
+
+function renderHeader() {
+  const now = new Date(), nowH = now.getHours() + now.getMinutes() / 60, today = (now.getDay() + 6) % 7;
+  $('fecha').textContent = now.toLocaleDateString('es', {weekday: 'long', day: 'numeric', month: 'long'});
+  const all = DATA.flatMap((k, i) => k.events.map(e => ({...e, kid: k.name, ki: i})));
+  const extra = all.filter(e => !e.school);
+  const todayEx = extra.filter(e => e.day === today).sort((a, b) => a.start - b.start);
+  const kidsToday = new Set(todayEx.map(e => e.kid)).size;
+  $('titulo').textContent = todayEx.length
+    ? `Hoy, ${todayEx.length} actividades fuera del cole para ${kidsToday} ${kidsToday === 1 ? 'hijo' : 'hijos'}`
+    : `Hoy no hay actividades fuera del cole`;
+  const perDay = DAYS.map((_, d) => extra.filter(e => e.day === d).reduce((s, e) => s + dur(e), 0));
+  const maxD = perDay.indexOf(Math.max(...perDay));
+  const nextE = todayEx.find(e => e.end > nowH);
+  const nextTxt = nextE ? (nextE.start <= nowH ? 'Ahora: ' : fmt(nextE.start) + ' · ') + `${nextE.kid} – ${nextE.name}` : 'Nada más hoy';
+  $('resumen').textContent = nextTxt;
+  const tot = extra.reduce((s, e) => s + dur(e), 0);
+  const busiest = DATA.map(k => ({n: k.name, h: k.events.filter(e => !e.school).reduce((s, e) => s + dur(e), 0)})).sort((a, b) => b.h - a.h)[0];
+  $('kpis').innerHTML = [
+    [extra.length, 'actividades extraescolares a la semana'],
+    [hrs(tot), 'de actividades en total'],
+    [DAYS[maxD], `el día más cargado (${hrs(perDay[maxD])})`],
+    [busiest ? esc(busiest.n) : '–', busiest ? `el más ocupado (${hrs(busiest.h)})` : ''],
+  ].map(([b, s]) => `<div class="kpi"><b>${b}</b><span>${s}</span></div>`).join('');
+}
+
+function renderDays() {
+  $('days').innerHTML = DAYS.map((d, i) =>
+    `<button data-d="${i}" aria-pressed="${i === day}" aria-label="${d}"><span class="lg">${d}</span></button>`).join('');
+  if (innerWidth < 600) $('days').querySelectorAll('.lg').forEach((s, i) => s.textContent = SHORT[i]);
+}
+
+function renderTimeline() {
+  const now = new Date(), nowH = now.getHours() + now.getMinutes() / 60, isToday = day === (now.getDay() + 6) % 7;
+  const pos = h => ((Math.min(Math.max(h, T0), T1) - T0) / (T1 - T0) * 100);
+  const ticks = [];
+  for (let h = T0; h <= T1; h += 2) ticks.push(`<span style="left:${pos(h)}%">${h}h</span>`);
+  const lanes = DATA.map((k, i) => {
+    const ev = k.events.filter(e => e.day === day && e.start != null);
+    const blocks = ev.map(e => `<div class="blk${e.school ? ' school' : ''}" style="left:${pos(e.start)}%;width:${pos(e.end) - pos(e.start)}%;background:${kidColor(i)}"
+      data-tip="${esc(k.name)} · ${esc(e.name)}<br>${fmt(e.start)}–${fmt(e.end)} (${hrs(dur(e))})">${esc(e.name)}<small>${fmt(e.start)}–${fmt(e.end)}</small></div>`).join('');
+    return `<div class="lane"><div class="n"><span class="dot" style="background:${kidColor(i)}"></span>${esc(k.name)}</div>
+      <div class="track">${blocks || '<span class="empty">Sin actividades</span>'}</div></div>`;
+  }).join('');
+  const nowLine = isToday && nowH >= T0 && nowH <= T1
+    ? `<div style="position:absolute;inset:0 0 0 var(--lw);pointer-events:none"><div class="nowline" style="left:${pos(nowH)}%"></div></div>` : '';
+  $('timeline').innerHTML = `<div class="axis"><span></span><div class="t">${ticks.join('')}</div></div>
+    <div class="tl" style="--lw:${innerWidth < 600 ? 64 : 96}px">${lanes}${nowLine}</div>`;
+}
+
+function renderHeat() {
+  const rows = DATA.map(k => DAYS.map((_, d) => k.events.filter(e => e.day === d && !e.school).reduce((s, e) => s + dur(e), 0)));
+  const max = Math.max(1, ...rows.flat());
+  $('heat').innerHTML = `<thead><tr><th></th>${SHORT.map((s, i) => `<th class="num" style="text-align:center" title="${DAYS[i]}">${s}</th>`).join('')}<th class="num">Total</th></tr></thead><tbody>` +
+    DATA.map((k, i) => `<tr><td><span class="dot" style="display:inline-block;background:${kidColor(i)};margin-right:6px"></span>${esc(k.name)}</td>` +
+      rows[i].map((v, d) => {
+        const a = v ? 0.18 + 0.72 * v / max : 0;
+        return `<td class="c" style="background:color-mix(in srgb, var(--ink) ${Math.round(a * 100)}%, var(--panel));color:${a > 0.55 ? 'var(--bg)' : 'inherit'}" data-tip="${esc(k.name)} · ${DAYS[d]}<br>${hrs(v)}">${v ? hrs(v).replace(' h', '') : '·'}</td>`;
+      }).join('') + `<td class="num"><b>${hrs(rows[i].reduce((s, v) => s + v, 0))}</b></td></tr>`).join('') + '</tbody>';
+}
+
+function renderActs() {
+  const map = new Map();
+  DATA.forEach((k, i) => k.events.filter(e => !e.school).forEach(e => {
+    const id = e.key + '|' + k.name;
+    const m = map.get(id) || {name: e.name, kid: k.name, ki: i, days: new Set(), h: 0};
+    m.days.add(e.day); m.h += dur(e); map.set(id, m);
+  }));
+  const list = [...map.values()].sort((a, b) => b.h - a.h);
+  $('acts').innerHTML = `<thead><tr><th>Actividad</th><th>Quién</th><th>Días</th><th class="num">h/sem</th></tr></thead><tbody>` +
+    (list.map(a => `<tr><td>${esc(a.name)}</td><td><span class="dot" style="display:inline-block;background:${kidColor(a.ki)};margin-right:6px"></span>${esc(a.kid)}</td>
+      <td>${[...a.days].sort().map(d => SHORT[d]).join(' ')}</td><td class="num">${hrs(a.h)}</td></tr>`).join('') || '<tr><td colspan="4">Sin actividades</td></tr>') + '</tbody>';
+}
+
+function renderWeek() {
+  $('tabs').innerHTML = DATA.map((k, i) => `<button data-k="${i}" aria-pressed="${i === kidSel}">${esc(k.name)}</button>`).join('');
+  const k = DATA[kidSel];
+  if (!k) { $('week').innerHTML = ''; return; }
+  const slots = k.slots.filter(s => s.start != null).sort((a, b) => a.start - b.start);
+  $('week').innerHTML = `<thead><tr><th>Hora</th>${DAYS.map(d => `<th>${d}</th>`).join('')}</tr></thead><tbody>` +
+    (slots.map(s => `<tr><td class="num" style="text-align:left">${fmt(s.start)}–${fmt(s.end)}</td>${DAYS.map((_, d) => {
+      const a = s.acts.find(x => x.day === d);
+      return `<td>${a ? esc(a.name) : ''}</td>`;
+    }).join('')}</tr>`).join('') || `<tr><td colspan="8">${esc(k.name)} no tiene actividades en el Excel todavía.</td></tr>`) + '</tbody>';
+}
+
+function renderAll() { renderHeader(); renderDays(); renderTimeline(); renderHeat(); renderActs(); renderWeek(); }
+
+function load(buf, source) {
+  try {
+    const wb = XLSX.read(buf, {type: 'array'});
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header: 1, raw: false, defval: null});
+    DATA = parseSheet(rows);
+    if (!DATA.length) throw new Error('No encuentro bloques de hijos en la primera hoja.');
+    $('fuente').textContent = source;
+    renderAll();
+  } catch (e) { showErr(e.message); }
+}
+function showErr(msg) {
+  $('timeline').innerHTML = `<p class="err">No se pudo leer el Excel: ${esc(msg)}</p>`;
+}
+
+document.addEventListener('click', ev => {
+  const d = ev.target.closest('[data-d]'), k = ev.target.closest('[data-k]');
+  if (d) { day = +d.dataset.d; renderDays(); renderTimeline(); }
+  if (k) { kidSel = +k.dataset.k; renderWeek(); }
+});
+const tip = $('tip');
+document.addEventListener('pointermove', ev => {
+  const t = ev.target.closest('[data-tip]');
+  if (!t) { tip.style.display = 'none'; return; }
+  tip.innerHTML = t.dataset.tip; tip.style.display = 'block';
+  tip.style.left = Math.min(ev.clientX + 14, innerWidth - tip.offsetWidth - 8) + 'px';
+  tip.style.top = (ev.clientY + 14) + 'px';
+});
+$('file').addEventListener('change', async ev => {
+  const f = ev.target.files[0];
+  if (f) load(new Uint8Array(await f.arrayBuffer()), `Vista previa local de «${f.name}» (no se ha subido a ningún sitio)`);
+});
+let rt; const onResize = () => { clearTimeout(rt); rt = setTimeout(() => DATA.length && (renderDays(), renderTimeline()), 150); };
+addEventListener('resize', onResize);
+setInterval(() => DATA.length && (renderHeader(), renderTimeline()), 60000);
+
+(async () => {
+  if (typeof XLSX === 'undefined') return showErr('no cargó la librería SheetJS.');
+  if (window.EMBEDDED_XLSX) {
+    const bin = atob(window.EMBEDDED_XLSX), u = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+    return load(u, 'Datos: copia incrustada de organizacion.xlsx');
+  }
+  try {
+    const r = await fetch(EXCEL + '?v=' + Date.now(), {cache: 'no-store'});
+    if (!r.ok) throw new Error(`${EXCEL} no está publicado (${r.status})`);
+    const lm = r.headers.get('last-modified');
+    load(new Uint8Array(await r.arrayBuffer()), `Datos: ${EXCEL}` + (lm ? ` · actualizado ${new Date(lm).toLocaleString('es')}` : ''));
+  } catch (e) { showErr(e.message); }
+})();
+}
+</script>
+</body>
+</html>
