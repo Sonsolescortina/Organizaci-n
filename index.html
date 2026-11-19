@@ -57,6 +57,18 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:now
 #tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--bg);padding:8px 10px;border-radius:8px;font-size:14px;display:none;z-index:9;max-width:240px}
 .foot{display:flex;flex-wrap:wrap;gap:12px;align-items:center;color:var(--mut);font-size:14px}
 .btn input{display:none}.btn{display:inline-flex;align-items:center}
+.banner{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+.tag{display:inline-flex;align-items:center;gap:6px;border-radius:8px;padding:6px 10px;font-size:14px;background:var(--panel)}
+.tag.off{background:light-dark(#fde2e1,#4a2120)}.tag.half{background:light-dark(#fff1d6,#3f3215)}.tag.warn{background:light-dark(#e8eef7,#1f2a3a)}
+.tag b{font-weight:700}
+.cal{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.4fr);gap:28px}
+@media(max-width:860px){.cal{grid-template-columns:minmax(0,1fr)}}
+.break{background:var(--panel);border-radius:12px;padding:16px 18px;margin-bottom:10px}
+.break b{display:block;font-size:20px;line-height:1.2}.break .big{font-size:40px;font-weight:800;line-height:1}
+.ev{list-style:none;margin:0;padding:0}.ev li{display:grid;grid-template-columns:92px minmax(0,1fr) auto;gap:10px;padding:8px 0;border-bottom:1px solid var(--rule);align-items:baseline}
+.ev .d{font-variant-numeric:tabular-nums;color:var(--mut);white-space:nowrap;font-size:14px}.ev .k{font-size:12px;color:var(--mut);white-space:nowrap}
+.mark{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;background:var(--rule)}
+.mark.off{background:#e34948}.mark.half{background:#eda100}.mark.warn{background:#2a78d6}
 .err{background:var(--panel);border-left:4px solid var(--now);padding:12px 16px;border-radius:8px}
 pre,.scroll{overflow-x:auto}
 @media(max-width:600px){.lane,.axis{grid-template-columns:64px minmax(0,1fr)}.lane>.n{font-size:14px}.blk small{display:none}.blk{font-size:12px;padding:3px 4px}
@@ -76,6 +88,7 @@ table{font-size:13px}.stack thead{display:none}.stack tr{display:grid;padding-bl
 <section class="band" aria-labelledby="h-dia">
   <h2 id="h-dia">Tablero del día</h2>
   <div class="days" id="days" role="group" aria-label="Elegir día"></div>
+  <div class="banner" id="banner"></div>
   <div id="timeline"></div>
 </section>
 
@@ -87,6 +100,17 @@ table{font-size:13px}.stack thead{display:none}.stack tr{display:grid;padding-bl
   <div>
     <h2>Actividades</h2>
     <table class="stack" id="acts"></table>
+  </div>
+</section>
+
+<section class="band" aria-labelledby="h-cal" id="calsec" hidden>
+  <h2 id="h-cal">Calendario del colegio (DAA 2026-27)</h2>
+  <div class="cal">
+    <div id="breaks"></div>
+    <div>
+      <div class="tabs" role="group" aria-label="Rango"><button data-r="8" aria-pressed="true">Próximas 8 semanas</button><button data-r="999" aria-pressed="false">Todo el curso</button></div>
+      <ul class="ev" id="events"></ul>
+    </div>
   </div>
 </section>
 
@@ -114,7 +138,7 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':
 const norm = s => String(s ?? '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 const fmt = h => { const H = Math.floor(h), M = Math.round((h - H) * 60); return H + ':' + String(M).padStart(2, '0'); };
 const hrs = h => (Math.round(h * 4) / 4).toLocaleString('es', {maximumFractionDigits: 2}) + ' h';
-let DATA = [], day = (new Date().getDay() + 6) % 7, kidSel = 0;
+let CAL = [], range = 8, DATA = [], day = (new Date().getDay() + 6) % 7, kidSel = 0;
 
 // "7,40 to 3", "6-7,15", "6,30-7-30" -> [{h,m},{h,m}]
 function parseRange(txt) {
@@ -163,6 +187,26 @@ function parseSheet(rows) {
   });
   return kids;
 }
+const ymd = d => d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+const fromY = n => new Date(Math.floor(n / 10000), Math.floor(n / 100) % 100 - 1, n % 100);
+const fmtD = (n, o = {day: 'numeric', month: 'short'}) => fromY(n).toLocaleDateString('es', o);
+const TYPES = {'sin cole': 'off', 'salida 12:00': 'half', 'aviso': 'warn'};
+function parseCal(wb) {
+  const name = wb.SheetNames.find(n => norm(n).includes('calend'));
+  if (!name) return [];
+  const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], {header: 1, raw: true, defval: null});
+  const toY = v => {
+    if (typeof v === 'number') { const p = XLSX.SSF.parse_date_code(v); return p.y * 10000 + p.m * 100 + p.d; }
+    const m = String(v ?? '').match(/(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})/);
+    return m ? +m[3] * 10000 + +m[2] * 100 + +m[1] : null;
+  };
+  return rows.slice(1).map(r => ({from: toY(r[0]), to: toY(r[1]) || toY(r[0]), name: String(r[2] ?? '').trim(),
+    type: TYPES[norm(r[3])] || 'ev', tipo: String(r[3] ?? '').trim(), who: String(r[4] ?? '').trim()}))
+    .filter(e => e.from && e.name).sort((a, b) => a.from - b.from);
+}
+const calOn = n => CAL.filter(e => e.from <= n && e.to >= n);
+const allKids = e => !e.who || norm(e.who) === 'todos';
+function dateOfDay(d) { const t = new Date(); t.setHours(12, 0, 0, 0); t.setDate(t.getDate() - ((t.getDay() + 6) % 7) + d); return t; }
 const kidColor = i => `var(--k${(i % 5) + 1})`;
 const dur = e => (e.end != null ? e.end - e.start : 0);
 
@@ -180,7 +224,9 @@ function renderHeader() {
   const maxD = perDay.indexOf(Math.max(...perDay));
   const nextE = todayEx.find(e => e.end > nowH);
   const nextTxt = nextE ? (nextE.start <= nowH ? 'Ahora: ' : fmt(nextE.start) + ' · ') + `${nextE.kid} – ${nextE.name}` : 'Nada más hoy';
-  $('resumen').textContent = nextTxt;
+  const todayCal = calOn(ymd(now));
+  const off = todayCal.find(e => e.type === 'off' && allKids(e));
+  $('resumen').textContent = (off ? `Hoy no hay cole: ${off.name}. ` : '') + nextTxt;
   const tot = extra.reduce((s, e) => s + dur(e), 0);
   const busiest = DATA.map(k => ({n: k.name, h: k.events.filter(e => !e.school).reduce((s, e) => s + dur(e), 0)})).sort((a, b) => b.h - a.h)[0];
   $('kpis').innerHTML = [
@@ -188,13 +234,19 @@ function renderHeader() {
     [hrs(tot), 'de actividades en total'],
     [DAYS[maxD], `el día más cargado (${hrs(perDay[maxD])})`],
     [busiest ? esc(busiest.n) : '–', busiest ? `el más ocupado (${hrs(busiest.h)})` : ''],
+    ...(() => { const t = ymd(now), nb = CAL.find(e => e.type === 'off' && allKids(e) && e.to >= t);
+      if (!nb) return [];
+      const days = Math.round((fromY(nb.from) - fromY(t)) / 864e5);
+      return [[days <= 0 ? 'Hoy' : days === 1 ? 'Mañana' : `${days} días`, `para «${esc(nb.name)}» (${fmtD(nb.from)})`]]; })(),
   ].map(([b, s]) => `<div class="kpi"><b>${b}</b><span>${s}</span></div>`).join('');
 }
 
 function renderDays() {
   $('days').innerHTML = DAYS.map((d, i) =>
-    `<button data-d="${i}" aria-pressed="${i === day}" aria-label="${d}"><span class="lg">${d}</span></button>`).join('');
+    { const n = ymd(dateOfDay(i)), off = calOn(n).some(e => e.type === 'off' && allKids(e));
+      return `<button data-d="${i}" aria-pressed="${i === day}" aria-label="${d} ${dateOfDay(i).getDate()}${off ? ', sin cole' : ''}"><span class="lg">${d}</span> ${dateOfDay(i).getDate()}${off ? ' <span class="mark off" style="margin:0 0 0 4px"></span>' : ''}</button>`; }).join('');
   if (innerWidth < 600) $('days').querySelectorAll('.lg').forEach((s, i) => s.textContent = SHORT[i]);
+  renderBanner();
 }
 
 function renderTimeline() {
@@ -203,7 +255,10 @@ function renderTimeline() {
   const ticks = [];
   for (let h = T0; h <= T1; h += 2) ticks.push(`<span style="left:${pos(h)}%">${h}h</span>`);
   const lanes = DATA.map((k, i) => {
-    const ev = k.events.filter(e => e.day === day && e.start != null);
+    const cev = calOn(ymd(dateOfDay(day)));
+    const noSchool = cev.some(e => e.type === 'off' && allKids(e)), half = cev.some(e => e.type === 'half');
+    const ev = k.events.filter(e => e.day === day && e.start != null && !(e.school && noSchool))
+      .map(e => e.school && half ? {...e, end: Math.min(e.end, 12)} : e);
     const blocks = ev.map(e => `<div class="blk${e.school ? ' school' : ''}" style="left:${pos(e.start)}%;width:${pos(e.end) - pos(e.start)}%;background:${kidColor(i)}"
       data-tip="${esc(k.name)} · ${esc(e.name)}<br>${fmt(e.start)}–${fmt(e.end)} (${hrs(dur(e))})">${esc(e.name)}<small>${fmt(e.start)}–${fmt(e.end)}</small></div>`).join('');
     return `<div class="lane"><div class="n"><span class="dot" style="background:${kidColor(i)}"></span>${esc(k.name)}</div>
@@ -251,11 +306,31 @@ function renderWeek() {
     }).join('')}</tr>`).join('') || `<tr><td colspan="8">${esc(k.name)} no tiene actividades en el Excel todavía.</td></tr>`) + '</tbody>';
 }
 
-function renderAll() { renderHeader(); renderDays(); renderTimeline(); renderHeat(); renderActs(); renderWeek(); }
+function renderBanner() {
+  const n = ymd(dateOfDay(day)), ev = calOn(n);
+  $('banner').innerHTML = ev.map(e => `<span class="tag ${e.type}"><b>${esc(e.tipo || 'Cole')}</b> ${esc(e.name)}${allKids(e) ? '' : ` · ${esc(e.who)}`}</span>`).join('');
+}
+function renderCal() {
+  $('calsec').hidden = !CAL.length;
+  if (!CAL.length) return;
+  const t = ymd(new Date()), lim = ymd(new Date(Date.now() + range * 7 * 864e5));
+  const breaks = CAL.filter(e => e.type === 'off' && allKids(e) && e.to >= t).slice(0, 3);
+  $('breaks').innerHTML = breaks.map((b, i) => {
+    const days = Math.round((fromY(b.from) - fromY(t)) / 864e5);
+    const span = b.from === b.to ? fmtD(b.from, {weekday: 'short', day: 'numeric', month: 'short'}) : `${fmtD(b.from)} – ${fmtD(b.to)}`;
+    return `<div class="break">${i === 0 ? `<span class="big">${days <= 0 ? 'Ahora' : days === 1 ? 'Mañana' : days}</span>${days > 1 ? ' días' : ''}` : ''}<b>${esc(b.name)}</b><span class="sub">${span}</span></div>`;
+  }).join('') || '<p class="sub">No quedan vacaciones este curso.</p>';
+  const list = CAL.filter(e => e.to >= t && e.from <= lim);
+  $('events').innerHTML = list.map(e => `<li><span class="d">${e.from === e.to ? fmtD(e.from) : fmtD(e.from) + '–' + fmtD(e.to)}</span>
+    <span><span class="mark ${e.type}"></span>${esc(e.name)}</span><span class="k">${esc(e.who)}</span></li>`).join('') || '<li>Nada en este periodo.</li>';
+  document.querySelectorAll('[data-r]').forEach(b => b.setAttribute('aria-pressed', +b.dataset.r === range));
+}
+function renderAll() { renderCal(); renderHeader(); renderDays(); renderTimeline(); renderHeat(); renderActs(); renderWeek(); }
 
 function load(buf, source) {
   try {
     const wb = XLSX.read(buf, {type: 'array'});
+    CAL = parseCal(wb);
     const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header: 1, raw: false, defval: null});
     DATA = parseSheet(rows);
     if (!DATA.length) throw new Error('No encuentro bloques de hijos en la primera hoja.');
@@ -271,6 +346,8 @@ document.addEventListener('click', ev => {
   const d = ev.target.closest('[data-d]'), k = ev.target.closest('[data-k]');
   if (d) { day = +d.dataset.d; renderDays(); renderTimeline(); }
   if (k) { kidSel = +k.dataset.k; renderWeek(); }
+  const r = ev.target.closest('[data-r]');
+  if (r) { range = +r.dataset.r; renderCal(); }
 });
 const tip = $('tip');
 document.addEventListener('pointermove', ev => {
